@@ -1,9 +1,10 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 import { useClientValue } from "@/lib/useClientValue";
-import { describeError, useSupport } from "@/lib/useSupport";
+import { useSupport } from "@/lib/useSupport";
 
 import { Button } from "./ui/Button";
 import { Card } from "./ui/Card";
@@ -22,6 +23,7 @@ type Feedback = { tone: NoticeTone; text: string };
 type DisplayMode = "standalone" | "browser";
 
 export const InstallCard = () => {
+  const t = useTranslations("cards.install");
   const support = useSupport(
     () => "onbeforeinstallprompt" in window || "BeforeInstallPromptEvent" in window,
   );
@@ -59,10 +61,7 @@ export const InstallCard = () => {
     const handleInstalled = () => {
       setModeOverride("standalone");
       setPromptEvent(null);
-      setFeedback({
-        tone: "success",
-        text: "App installed. Launch it from your home screen or app launcher.",
-      });
+      setFeedback({ tone: "success", text: t("installed") });
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
@@ -74,7 +73,7 @@ export const InstallCard = () => {
       window.removeEventListener("appinstalled", handleInstalled);
       standaloneQuery.removeEventListener("change", handleChange);
     };
-  }, []);
+  }, [t]);
 
   const handleInstall = async () => {
     if (!promptEvent) {
@@ -88,19 +87,15 @@ export const InstallCard = () => {
     try {
       await captured.prompt();
       const choice = await captured.userChoice;
-      setFeedback(
-        choice.outcome === "accepted"
-          ? {
-              tone: "success",
-              text: "Install accepted — the browser is adding the app to your device.",
-            }
-          : {
-              tone: "info",
-              text: "Install dismissed. The browser decides when to offer the prompt again.",
-            },
-      );
+      setFeedback({
+        tone: choice.outcome === "accepted" ? "success" : "info",
+        text: choice.outcome === "accepted" ? t("accepted") : t("dismissed"),
+      });
     } catch (error) {
-      setFeedback({ tone: "danger", text: describeError(error) });
+      setFeedback({
+        tone: "danger",
+        text: error instanceof Error ? error.message : t("whyDisabledNotice"),
+      });
     } finally {
       setBusy(false);
     }
@@ -111,36 +106,33 @@ export const InstallCard = () => {
   return (
     <Card
       index={1}
-      title="Installability"
+      namespace="cards.install"
       api="beforeinstallprompt"
       icon="install"
       support={support}
-      description="Capture the browser's install prompt and detect whether the app is already running in standalone mode."
-      footnote="The prompt only fires over HTTPS with a valid manifest, icons and a registered service worker."
     >
       <DataList
         items={[
-          { label: "Display mode", value: installed ? "standalone" : "browser" },
           {
-            label: "Prompt event",
-            value: promptEvent ? "captured" : support === "checking" ? "…" : "not captured",
+            label: t("displayMode"),
+            value: installed ? t("standalone") : t("browser"),
+          },
+          {
+            label: t("promptEvent"),
+            value: promptEvent ? t("captured") : t("notCaptured"),
           },
         ]}
       />
 
       {installed ? (
-        <Notice tone="success">
-          Installed — this window is already running as a standalone app.
-        </Notice>
+        <Notice tone="success">{t("installed")}</Notice>
       ) : support === "unsupported" ? (
-        <Notice tone="warn">
-          This browser does not support programmatic installation. On iOS use Share →
-          &ldquo;Add to Home Screen&rdquo;; Firefox installs through its own menu.
-        </Notice>
+        <Notice tone="warn">{t("unsupported")}</Notice>
       ) : support === "supported" && !promptEvent && !dismissedIntro ? (
         <Notice>
-          Waiting for the browser to fire <code className="font-mono">beforeinstallprompt</code>.
-          It usually needs a reload over HTTPS and a satisfied install criteria check.
+          {t.rich("waiting", {
+            code: (chunks) => <code className="font-mono">{chunks}</code>,
+          })}
         </Notice>
       ) : null}
 
@@ -157,20 +149,17 @@ export const InstallCard = () => {
           disabled={!canPrompt || busy}
           aria-busy={busy}
         >
-          {busy ? "Prompting…" : "Install app"}
+          {busy ? t("prompting") : t("install")}
         </Button>
         {!installed && support === "supported" ? (
           <Button
             variant="ghost"
             onClick={() => {
               setDismissedIntro(true);
-              setFeedback({
-                tone: "info",
-                text: "Installability needs a service worker and manifest served over HTTPS.",
-              });
+              setFeedback({ tone: "info", text: t("whyDisabledNotice") });
             }}
           >
-            Why disabled?
+            {t("whyDisabled")}
           </Button>
         ) : null}
       </div>

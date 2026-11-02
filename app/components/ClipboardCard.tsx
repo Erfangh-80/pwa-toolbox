@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { describeError, useSupport } from "@/lib/useSupport";
@@ -10,22 +11,9 @@ import { Notice, type NoticeTone } from "./ui/Notice";
 
 type Feedback = { tone: NoticeTone; text: string };
 
-const describeClipboardError = (error: unknown): string => {
-  if (error instanceof DOMException) {
-    if (error.name === "NotAllowedError") {
-      return "Clipboard access denied. Grant permission in site settings and keep the tab focused.";
-    }
-    if (error.name === "SecurityError") {
-      return "Clipboard access requires a secure (HTTPS) context.";
-    }
-    if (error.name === "NotFoundError") {
-      return "The clipboard is empty or contains no text.";
-    }
-  }
-  return describeError(error);
-};
-
 export const ClipboardCard = () => {
+  const t = useTranslations("cards.clipboard");
+  const tCommon = useTranslations("common");
   const support = useSupport(
     () => "clipboard" in navigator && typeof navigator.clipboard.readText === "function",
   );
@@ -34,11 +22,26 @@ export const ClipboardCard = () => {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
+  const describeClipboardError = (error: unknown): string => {
+    if (error instanceof DOMException) {
+      if (error.name === "NotAllowedError") {
+        return t("errorDenied");
+      }
+      if (error.name === "SecurityError") {
+        return t("errorSecurity");
+      }
+      if (error.name === "NotFoundError") {
+        return t("errorEmpty");
+      }
+    }
+    return tCommon("browserError", { message: describeError(error) });
+  };
+
   const handleCopy = async () => {
     setBusy(true);
     try {
       await navigator.clipboard.writeText(draft);
-      setFeedback({ tone: "success", text: `Copied ${draft.length} character(s) to the clipboard.` });
+      setFeedback({ tone: "success", text: t("copied", { count: draft.length }) });
     } catch (error) {
       setFeedback({ tone: "danger", text: describeClipboardError(error) });
     } finally {
@@ -51,11 +54,10 @@ export const ClipboardCard = () => {
     try {
       const value = await navigator.clipboard.readText();
       setPasted(value);
-      setFeedback(
-        value
-          ? { tone: "success", text: "Pasted the current clipboard text." }
-          : { tone: "info", text: "The clipboard is empty." },
-      );
+      setFeedback({
+        tone: value ? "success" : "info",
+        text: value ? t("pasted") : t("clipboardEmpty"),
+      });
     } catch (error) {
       setFeedback({ tone: "danger", text: describeClipboardError(error) });
     } finally {
@@ -66,20 +68,19 @@ export const ClipboardCard = () => {
   return (
     <Card
       index={9}
-      title="Clipboard"
+      namespace="cards.clipboard"
       api="navigator.clipboard"
       icon="clipboard"
       support={support}
-      description="Write text to the system clipboard and read it back. Both directions surface permission and security errors."
-      footnote="Reading requires a user gesture plus clipboard-read permission in most browsers."
     >
       <TextField
         id="clipboard-text"
-        label="Text to copy"
+        label={t("label")}
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         disabled={support === "unsupported"}
         autoComplete="off"
+        dir="auto"
       />
 
       <div className="flex flex-wrap gap-2">
@@ -89,30 +90,24 @@ export const ClipboardCard = () => {
           disabled={support !== "supported" || busy || draft.length === 0}
           aria-busy={busy}
         >
-          Copy
+          {t("copy")}
         </Button>
-        <Button
-          onClick={() => void handlePaste()}
-          disabled={support !== "supported" || busy}
-        >
-          Paste
+        <Button onClick={() => void handlePaste()} disabled={support !== "supported" || busy}>
+          {t("paste")}
         </Button>
       </div>
 
       <div className="rounded-lg border border-line">
         <p className="border-b border-line px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
-          Clipboard content
+          {t("contentTitle")}
         </p>
-        <p className="min-h-16 px-3 py-2 break-words whitespace-pre-wrap font-mono text-xs text-ink">
-          {pasted || <span className="text-muted">Nothing pasted yet.</span>}
+        <p className="bidi-plain min-h-16 px-3 py-2 break-words whitespace-pre-wrap font-mono text-xs text-ink">
+          {pasted || <span className="text-muted">{t("empty")}</span>}
         </p>
       </div>
 
       {support === "unsupported" ? (
-        <Notice tone="warn">
-          The async Clipboard API is unavailable. This usually means an insecure origin or
-          an older browser.
-        </Notice>
+        <Notice tone="warn">{t("noticeUnsupported")}</Notice>
       ) : null}
 
       {feedback ? (

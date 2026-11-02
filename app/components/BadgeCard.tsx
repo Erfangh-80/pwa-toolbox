@@ -1,5 +1,6 @@
 "use client";
 
+import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { describeError, useSupport } from "@/lib/useSupport";
@@ -11,43 +12,46 @@ import { Notice, type NoticeTone } from "./ui/Notice";
 
 type Feedback = { tone: NoticeTone; text: string };
 
-const describeBadgeError = (error: unknown): string => {
-  if (error instanceof DOMException) {
-    if (error.name === "NotAllowedError") {
-      return "The badge was rejected. Install the app first (badging needs an installed PWA).";
-    }
-    if (error.name === "NotSupportedError") {
-      return "This platform does not display app badges.";
-    }
-  }
-  return describeError(error);
-};
-
 export const BadgeCard = () => {
+  const t = useTranslations("cards.badge");
+  const tCommon = useTranslations("common");
+  const format = useFormatter();
   const support = useSupport(() => "setAppBadge" in navigator);
   const [value, setValue] = useState("3");
   const [activeBadge, setActiveBadge] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
+  const describeBadgeError = (error: unknown): string => {
+    if (error instanceof DOMException) {
+      if (error.name === "NotAllowedError") {
+        return t("errorRejected");
+      }
+      if (error.name === "NotSupportedError") {
+        return t("errorUnsupported");
+      }
+    }
+    return tCommon("browserError", { message: describeError(error) });
+  };
+
   const handleSet = async () => {
     const parsed = Number(value);
 
     if (!Number.isInteger(parsed) || parsed < 0) {
-      setFeedback({ tone: "warn", text: "Enter a whole number of 0 or greater." });
+      setFeedback({ tone: "warn", text: t("errorInvalid") });
       return;
     }
 
     setBusy(true);
     try {
       if (!navigator.setAppBadge) {
-        throw new Error("The Badging API is not available.");
+        throw new Error(t("unavailable"));
       }
       await navigator.setAppBadge(parsed);
       setActiveBadge(parsed);
       setFeedback({
         tone: "success",
-        text: parsed === 0 ? "Badge cleared with setAppBadge(0)." : `Badge set to ${parsed}.`,
+        text: parsed === 0 ? t("setZero") : t("setValue", { value: format.number(parsed) }),
       });
     } catch (error) {
       setFeedback({ tone: "danger", text: describeBadgeError(error) });
@@ -60,11 +64,11 @@ export const BadgeCard = () => {
     setBusy(true);
     try {
       if (!navigator.clearAppBadge) {
-        throw new Error("The Badging API is not available.");
+        throw new Error(t("unavailable"));
       }
       await navigator.clearAppBadge();
       setActiveBadge(null);
-      setFeedback({ tone: "success", text: "Badge cleared." });
+      setFeedback({ tone: "success", text: t("cleared") });
     } catch (error) {
       setFeedback({ tone: "danger", text: describeBadgeError(error) });
     } finally {
@@ -73,18 +77,10 @@ export const BadgeCard = () => {
   };
 
   return (
-    <Card
-      index={12}
-      title="App badging"
-      api="navigator.setAppBadge"
-      icon="badge"
-      support={support}
-      description="Set or clear the numeric badge on the installed app icon — useful for unread counts."
-      footnote="Supported on Chromium (desktop + Android) for installed PWAs; iOS Safari ignores it."
-    >
+    <Card index={12} namespace="cards.badge" api="navigator.setAppBadge" icon="badge" support={support}>
       <TextField
         id="badge-value"
-        label="Badge value"
+        label={t("valueLabel")}
         type="number"
         min={0}
         max={9999}
@@ -98,23 +94,24 @@ export const BadgeCard = () => {
       <DataList
         items={[
           {
-            label: "Badging API",
+            label: t("api"),
             value:
               support === "checking"
-                ? "checking…"
+                ? tCommon("checkingValue")
                 : support === "supported"
-                  ? "available"
-                  : "unavailable",
+                  ? tCommon("available")
+                  : tCommon("unavailable"),
           },
-          { label: "Active badge", value: activeBadge === null ? "none" : String(activeBadge) },
+          {
+            label: t("active"),
+            value:
+              activeBadge === null ? tCommon("none") : format.number(activeBadge),
+          },
         ]}
       />
 
       {support === "unsupported" ? (
-        <Notice tone="warn">
-          navigator.setAppBadge is unavailable. Badging requires an installed PWA on a
-          supporting platform.
-        </Notice>
+        <Notice tone="warn">{t("noticeUnsupported")}</Notice>
       ) : null}
 
       {feedback ? (
@@ -130,14 +127,14 @@ export const BadgeCard = () => {
           disabled={support !== "supported" || busy}
           aria-busy={busy}
         >
-          Set badge
+          {t("set")}
         </Button>
         <Button
           variant="danger"
           onClick={() => void handleClear()}
           disabled={support !== "supported" || busy}
         >
-          Clear badge
+          {t("clear")}
         </Button>
       </div>
     </Card>

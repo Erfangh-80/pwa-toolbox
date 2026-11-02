@@ -95,3 +95,18 @@ title · `clamp(28px, 4vw, 40px)` page title. Body line-height `1.5+`.
   result or error inline.
 - No emoji icons, no mixed flat/skeuomorphic styles, no raw hex values in components
   (tokens only), no text below 12px.
+
+## 8. Localization & RTL (en / fa)
+
+| Concern | Decision |
+| --- | --- |
+| Direction | `<html dir>` is `rtl` for `fa`, `ltr` for `en` — set once in `app/[locale]/layout.tsx`. |
+| Layout mirroring | Only logical utilities: `ms-*`/`me-*`, `ps-*`/`pe-*`, `text-start`/`text-end`, `start-*`/`end-*`. Flex/grid rows flip automatically with `dir`. |
+| Directional icons | Arrows swap with the `rtl:` variant (`rtl:-scale-x-100`) instead of a second icon. |
+| Latin values in RTL | `.bidi-plain` (`unicode-bidi: plaintext`) on data values, URLs and pasted text so identifiers keep their own direction while staying start-aligned. |
+| Fonts | `[lang="fa"]` swaps `--font-sans`/`--font-mono` for a Persian stack (Vazirmatn → IRANSans → Noto Naskh Arabic → Segoe UI → Tahoma). No remote font loading. |
+| Tracking | `[lang="fa"] [class*="tracking-"] { letter-spacing: normal }` — letter-spacing breaks connected Arabic script. |
+| Line height | Persian body line-height is raised to `1.75`. |
+| Numbers & dates | `useFormatter()` → Persian digits and Jalali dates on `fa` pages (byte units stay SI: KB/MB). |
+| Labels | Uppercase/tracking eyebrows are kept in English and neutralised in Persian; card eyebrows become `بخش ۰۱ · API`. |
+| Touch targets | unchanged: 44×44 px minimum, also in RTL. |
