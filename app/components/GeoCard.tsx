@@ -1,5 +1,6 @@
 "use client";
 
+import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { useSupport } from "@/lib/useSupport";
@@ -18,28 +19,31 @@ type PositionData = {
 
 type Feedback = { tone: NoticeTone; text: string };
 
-const describeGeoError = (error: GeolocationPositionError): string => {
-  switch (error.code) {
-    case error.PERMISSION_DENIED:
-      return "Permission denied — allow location access for this origin and try again.";
-    case error.POSITION_UNAVAILABLE:
-      return "Position unavailable — the device could not determine a location.";
-    case error.TIMEOUT:
-      return "Timed out while waiting for a position fix.";
-    default:
-      return error.message || "Geolocation failed.";
-  }
-};
-
 export const GeoCard = () => {
+  const t = useTranslations("cards.geo");
+  const tCommon = useTranslations("common");
+  const format = useFormatter();
   const support = useSupport(() => "geolocation" in navigator);
   const [position, setPosition] = useState<PositionData | null>(null);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
+  const describeGeoError = (error: GeolocationPositionError): string => {
+    switch (error.code) {
+      case error.PERMISSION_DENIED:
+        return t("errorDenied");
+      case error.POSITION_UNAVAILABLE:
+        return t("errorUnavailable");
+      case error.TIMEOUT:
+        return t("errorTimeout");
+      default:
+        return error.message || t("errorGeneric");
+    }
+  };
+
   const handleRequest = () => {
     if (!("geolocation" in navigator)) {
-      setFeedback({ tone: "warn", text: "Geolocation is not supported in this browser." });
+      setFeedback({ tone: "warn", text: t("noticeUnsupported") });
       return;
     }
 
@@ -54,7 +58,7 @@ export const GeoCard = () => {
           accuracy: result.coords.accuracy,
           timestamp: result.timestamp,
         });
-        setFeedback({ tone: "success", text: "Position acquired." });
+        setFeedback({ tone: "success", text: t("acquired") });
         setLoading(false);
       },
       (error) => {
@@ -67,35 +71,32 @@ export const GeoCard = () => {
   };
 
   return (
-    <Card
-      index={5}
-      title="Geolocation"
-      api="navigator.geolocation"
-      icon="geo"
-      support={support}
-      description="Request a one-shot position fix with high accuracy and inspect the reported coordinates and accuracy radius."
-      footnote="Requires a secure origin; browsers only ask once per session and remember the answer per origin."
-    >
+    <Card index={5} namespace="cards.geo" api="navigator.geolocation" icon="geo" support={support}>
       {position ? (
         <DataList
           items={[
-            { label: "Latitude", value: position.latitude.toFixed(6) },
-            { label: "Longitude", value: position.longitude.toFixed(6) },
-            { label: "Accuracy", value: `${position.accuracy.toFixed(1)} m` },
+            { label: t("latitude"), value: position.latitude.toFixed(6) },
+            { label: t("longitude"), value: position.longitude.toFixed(6) },
             {
-              label: "Timestamp",
-              value: new Date(position.timestamp).toLocaleTimeString(),
+              label: t("accuracy"),
+              value: t("accuracyValue", {
+                value: format.number(position.accuracy, { maximumFractionDigits: 1 }),
+              }),
+            },
+            {
+              label: t("timestamp"),
+              value: format.dateTime(new Date(position.timestamp), { timeStyle: "medium" }),
             },
           ]}
         />
       ) : (
         <p className="rounded-lg border border-dashed border-line px-3 py-6 text-center font-mono text-xs text-muted">
-          No position requested yet.
+          {t("empty")}
         </p>
       )}
 
       {support === "unsupported" ? (
-        <Notice tone="warn">Geolocation is not available, so coordinates cannot be read.</Notice>
+        <Notice tone="warn">{t("noticeUnsupported")}</Notice>
       ) : null}
 
       {feedback ? (
@@ -111,11 +112,11 @@ export const GeoCard = () => {
           disabled={support !== "supported" || loading}
           aria-busy={loading}
         >
-          {loading ? "Locating…" : "Get location"}
+          {loading ? t("locating") : t("get")}
         </Button>
         {position ? (
           <Button variant="ghost" onClick={() => setPosition(null)}>
-            Clear
+            {tCommon("clear")}
           </Button>
         ) : null}
       </div>

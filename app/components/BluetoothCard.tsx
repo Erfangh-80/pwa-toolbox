@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useCallback, useRef, useState } from "react";
 
 import { describeError, useSupport } from "@/lib/useSupport";
@@ -18,6 +19,8 @@ type ConnectedDevice = {
 type Feedback = { tone: NoticeTone; text: string };
 
 export const BluetoothCard = () => {
+  const t = useTranslations("cards.bluetooth");
+  const tCommon = useTranslations("common");
   const support = useSupport(() => "bluetooth" in navigator);
   const deviceRef = useRef<ToolboxBluetoothDevice | null>(null);
   const [device, setDevice] = useState<ConnectedDevice | null>(null);
@@ -26,8 +29,8 @@ export const BluetoothCard = () => {
 
   const handleGattDisconnected = useCallback(() => {
     setDevice((current) => (current ? { ...current, connected: false } : current));
-    setFeedback({ tone: "info", text: "GATT server disconnected." });
-  }, []);
+    setFeedback({ tone: "info", text: t("gattDisconnected") });
+  }, [t]);
 
   const handleScan = async () => {
     setBusy(true);
@@ -36,7 +39,7 @@ export const BluetoothCard = () => {
     try {
       const bluetooth = navigator.bluetooth;
       if (!bluetooth) {
-        throw new Error("Web Bluetooth is not available in this browser.");
+        throw new Error(t("unavailable"));
       }
 
       const selected = await bluetooth.requestDevice({ acceptAllDevices: true });
@@ -51,21 +54,22 @@ export const BluetoothCard = () => {
 
       setDevice({
         id: selected.id,
-        name: selected.name?.trim() || "(unnamed device)",
+        name: selected.name?.trim() || t("unnamed"),
         connected,
       });
 
-      setFeedback(
-        connected
-          ? { tone: "success", text: "GATT server connected." }
-          : { tone: "warn", text: "Device selected, but no GATT server is available." },
-      );
+      setFeedback({
+        tone: connected ? "success" : "warn",
+        text: connected ? t("gattConnected") : t("noGatt"),
+      });
     } catch (error) {
-      if (error instanceof DOMException && error.name === "NotFoundError") {
-        setFeedback({ tone: "info", text: "No device selected." });
-      } else {
-        setFeedback({ tone: "danger", text: describeError(error) });
-      }
+      setFeedback({
+        tone: error instanceof DOMException && error.name === "NotFoundError" ? "info" : "danger",
+        text:
+          error instanceof DOMException && error.name === "NotFoundError"
+            ? t("noDevice")
+            : tCommon("browserError", { message: describeError(error) }),
+      });
     } finally {
       setBusy(false);
     }
@@ -77,41 +81,42 @@ export const BluetoothCard = () => {
       deviceRef.current?.removeEventListener("gattserverdisconnected", handleGattDisconnected);
       deviceRef.current = null;
       setDevice(null);
-      setFeedback({ tone: "info", text: "Disconnected and released the device." });
+      setFeedback({ tone: "info", text: t("released") });
     } catch (error) {
-      setFeedback({ tone: "danger", text: describeError(error) });
+      setFeedback({
+        tone: "danger",
+        text: tCommon("browserError", { message: describeError(error) }),
+      });
     }
   };
 
   return (
     <Card
       index={6}
-      title="Web Bluetooth"
+      namespace="cards.bluetooth"
       api="navigator.bluetooth"
       icon="bluetooth"
       support={support}
-      description="Scan for a nearby BLE peripheral, connect to its GATT server and inspect the selected device identity."
-      footnote="Chromium on desktop/Android only — Safari and Firefox do not implement Web Bluetooth."
     >
       {device ? (
         <DataList
           items={[
-            { label: "Device", value: device.name },
-            { label: "ID", value: device.id },
-            { label: "GATT", value: device.connected ? "connected" : "disconnected" },
+            { label: t("device"), value: device.name },
+            { label: t("id"), value: device.id },
+            {
+              label: t("gatt"),
+              value: device.connected ? t("connected") : t("disconnected"),
+            },
           ]}
         />
       ) : (
         <p className="rounded-lg border border-dashed border-line px-3 py-6 text-center font-mono text-xs text-muted">
-          No device connected.
+          {t("empty")}
         </p>
       )}
 
       {support === "unsupported" ? (
-        <Notice tone="warn">
-          Web Bluetooth is not supported here (iOS/Safari and Firefox never expose it).
-          Use Chrome or Edge on desktop or Android.
-        </Notice>
+        <Notice tone="warn">{t("noticeUnsupported")}</Notice>
       ) : null}
 
       {feedback ? (
@@ -127,10 +132,10 @@ export const BluetoothCard = () => {
           disabled={support !== "supported" || busy}
           aria-busy={busy}
         >
-          {busy ? "Scanning…" : device ? "Scan again" : "Scan for devices"}
+          {busy ? t("scanning") : device ? t("scanAgain") : t("scan")}
         </Button>
         <Button variant="danger" onClick={handleDisconnect} disabled={!device}>
-          Disconnect
+          {t("disconnect")}
         </Button>
       </div>
     </Card>

@@ -64,6 +64,36 @@
   }
 }
 
+/* ---------------------------------------------------------------- *
+ * Right-to-left / Persian typography
+ *
+ * Layout flipping is handled by the `dir` attribute plus Tailwind's
+ * logical utilities (`ms-*`, `ps-*`, `text-start`, …); these rules only
+ * cover what CSS alone can fix: font stacks, tracking and text direction
+ * of mixed Latin values.
+ * ---------------------------------------------------------------- */
+
+/*
+ * `[lang="fa"]` (rather than `html[lang="fa"]`) also covers islands that Next
+ * renders outside the locale layout — e.g. the 404 page, which is wrapped in its
+ * own error shell — and the `lang`-tagged language-switcher buttons.
+ */
+[lang="fa"] {
+  /* Persian has no monospace tradition; one face reads better than a
+     monospace fallback, and installed Persian fonts are preferred. */
+  --font-sans: "Vazirmatn", "IRANSans", "Noto Naskh Arabic", "Segoe UI", Tahoma,
+    system-ui, sans-serif;
+  --font-mono: "Vazirmatn", "IRANSans", "Noto Naskh Arabic", "Segoe UI", Tahoma,
+    ui-monospace, monospace;
+  line-height: 1.75;
+}
+
+/* Letter spacing breaks connected Arabic script, so neutralise every
+   `tracking-*` utility while Persian is active. */
+[lang="fa"] [class*="tracking-"] {
+  letter-spacing: normal;
+}
+
 @utility bg-grid {
   background-image: linear-gradient(
       to right,
@@ -76,4 +106,14 @@
       transparent 1px
     );
   background-size: 56px 56px;
+}
+
+/*
+ * Mixed-direction values (IDs, URLs, hex numbers, coordinates) inside an RTL
+ * layout: keep the block aligned to the start edge but let the text follow its
+ * own direction instead of the surrounding paragraph's.
+ */
+@utility bidi-plain {
+  unicode-bidi: plaintext;
+  text-align: start;
 }

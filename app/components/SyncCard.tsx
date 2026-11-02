@@ -1,5 +1,6 @@
 "use client";
 
+import { useFormatter, useTranslations } from "next-intl";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import {
@@ -53,6 +54,9 @@ const getRegistration = async (): Promise<SyncRegistration | null> => {
 };
 
 export const SyncCard = () => {
+  const t = useTranslations("cards.sync");
+  const tCommon = useTranslations("common");
+  const format = useFormatter();
   const support = useSupport(
     () => typeof indexedDB !== "undefined" && typeof fetch === "function",
   );
@@ -67,9 +71,12 @@ export const SyncCard = () => {
     try {
       setItems(await listPendingMessages());
     } catch (error) {
-      setFeedback({ tone: "danger", text: describeError(error) });
+      setFeedback({
+        tone: "danger",
+        text: tCommon("browserError", { message: describeError(error) }),
+      });
     }
-  }, []);
+  }, [tCommon]);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,7 +89,10 @@ export const SyncCard = () => {
         }
       } catch (error) {
         if (!cancelled) {
-          setFeedback({ tone: "danger", text: describeError(error) });
+          setFeedback({
+            tone: "danger",
+            text: tCommon("browserError", { message: describeError(error) }),
+          });
         }
       }
     })();
@@ -90,7 +100,7 @@ export const SyncCard = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [tCommon]);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,13 +164,13 @@ export const SyncCard = () => {
     });
 
     if (!response.ok) {
-      throw new Error(`Mock sync endpoint responded with ${response.status}.`);
+      throw new Error(t("endpointError", { status: format.number(response.status) }));
     }
 
     await clearPendingMessages();
     await refresh();
     return pending.length;
-  }, [refresh]);
+  }, [format, refresh, t]);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -171,7 +181,7 @@ export const SyncCard = () => {
           if (sent > 0) {
             setFeedback({
               tone: "success",
-              text: `Connection restored — flushed ${sent} pending item${sent === 1 ? "" : "s"} to ${SYNC_ENDPOINT}.`,
+              text: t("flushedOnReconnect", { count: sent, endpoint: SYNC_ENDPOINT }),
             });
           }
         } catch (error) {
@@ -184,14 +194,14 @@ export const SyncCard = () => {
 
     window.addEventListener("online", handleOnline);
     return () => window.removeEventListener("online", handleOnline);
-  }, [flush]);
+  }, [flush, t]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const value = draft.trim();
 
     if (!value) {
-      setFeedback({ tone: "warn", text: "Type a message before saving." });
+      setFeedback({ tone: "warn", text: t("emptyDraft") });
       return;
     }
 
@@ -201,14 +211,12 @@ export const SyncCard = () => {
       setDraft("");
       await refresh();
 
-      let text = "Saved to IndexedDB.";
-      if (navigator.onLine) {
-        text += ' You are online — press "Sync now" to send it.';
-      } else {
+      let text = t("savedOnline");
+      if (!navigator.onLine) {
         const registered = await registerSync();
-        text += registered
-          ? ` Background sync "${SYNC_TAG}" registered; the service worker will flush it.`
-          : " Background sync is unavailable here, so this card will flush the queue when the connection returns.";
+        text = registered
+          ? t("savedOfflineWithSync", { tag: SYNC_TAG })
+          : t("savedOfflineNoSync");
       }
 
       setFeedback({ tone: "success", text });
@@ -223,11 +231,7 @@ export const SyncCard = () => {
     setSyncing(true);
     try {
       const sent = await flush();
-      setFeedback(
-        sent > 0
-          ? { tone: "success", text: `Sent ${sent} item${sent === 1 ? "" : "s"} and cleared the queue.` }
-          : { tone: "info", text: "The queue is already empty." },
-      );
+      setFeedback({ tone: sent > 0 ? "success" : "info", text: t("flushed", { count: sent }) });
     } catch (error) {
       setFeedback({ tone: "danger", text: describeError(error) });
     } finally {
@@ -239,7 +243,7 @@ export const SyncCard = () => {
     try {
       await deletePendingMessage(id);
       await refresh();
-      setFeedback({ tone: "info", text: "Pending item removed locally." });
+      setFeedback({ tone: "info", text: t("removed") });
     } catch (error) {
       setFeedback({ tone: "danger", text: describeError(error) });
     }
@@ -249,50 +253,59 @@ export const SyncCard = () => {
     try {
       await clearPendingMessages();
       await refresh();
-      setFeedback({ tone: "info", text: "Queue cleared." });
+      setFeedback({ tone: "info", text: t("cleared") });
     } catch (error) {
       setFeedback({ tone: "danger", text: describeError(error) });
     }
   };
 
+  const syncStateLabel =
+    backgroundSync === "checking"
+      ? tCommon("checkingValue")
+      : backgroundSync === "available"
+        ? t("syncManagerAvailable")
+        : backgroundSync === "no-registration"
+          ? t("noWorker")
+          : tCommon("notSupported");
+
   return (
     <Card
       index={3}
-      title="Background sync"
+      namespace="cards.sync"
       api="IndexedDB + SyncManager"
       icon="sync"
       support={support}
-      description="Queue messages in IndexedDB while offline, ask the service worker for a background sync, and flush to a mock endpoint once the connection returns."
-      footnote={`Tag: ${SYNC_TAG} · endpoint: ${SYNC_ENDPOINT}`}
+      footnoteValues={{ tag: SYNC_TAG, endpoint: SYNC_ENDPOINT }}
     >
       <form className="flex flex-col gap-2" onSubmit={handleSubmit}>
         <TextField
           id="sync-message"
-          label="Message"
-          placeholder="Queued while offline…"
+          label={t("messageLabel")}
+          placeholder={t("placeholder")}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           disabled={support === "unsupported"}
           autoComplete="off"
+          dir="auto"
           maxLength={500}
         />
         <div className="flex flex-wrap gap-2">
           <Button type="submit" variant="primary" disabled={busy || support !== "supported"}>
-            {busy ? "Saving…" : "Save offline"}
+            {busy ? t("saving") : t("save")}
           </Button>
           <Button
             onClick={() => void handleFlush()}
             disabled={syncing || support !== "supported" || items.length === 0}
             aria-busy={syncing}
           >
-            {syncing ? "Syncing…" : "Sync now"}
+            {syncing ? t("syncing") : t("syncNow")}
           </Button>
           <Button
             variant="ghost"
             onClick={() => void handleClear()}
             disabled={support !== "supported" || items.length === 0}
           >
-            Clear
+            {tCommon("clear")}
           </Button>
         </div>
       </form>
@@ -300,34 +313,34 @@ export const SyncCard = () => {
       <div className="rounded-lg border border-line">
         <div className="flex items-center justify-between border-b border-line px-3 py-2">
           <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
-            Pending items
+            {t("pending")}
           </p>
           <span className="rounded-full border border-line px-2 py-0.5 font-mono text-[10px] text-muted">
-            {items.length}
+            {format.number(items.length)}
           </span>
         </div>
         {items.length === 0 ? (
-          <p className="px-3 py-3 text-xs text-muted">The queue is empty.</p>
+          <p className="px-3 py-3 text-xs text-muted">{t("queueEmpty")}</p>
         ) : (
           <ul className="max-h-44 divide-y divide-line overflow-y-auto">
             {items.map((item) => (
               <li key={item.id} className="flex items-start gap-2 px-3 py-2">
                 <div className="min-w-0 flex-1">
-                  <p className="break-words font-mono text-xs text-ink">{item.text}</p>
+                  <p className="bidi-plain break-words font-mono text-xs text-ink">{item.text}</p>
                   <time
                     dateTime={new Date(item.createdAt).toISOString()}
                     className="font-mono text-[10px] text-muted"
                   >
-                    {new Date(item.createdAt).toLocaleTimeString()}
+                    {format.dateTime(new Date(item.createdAt), { timeStyle: "medium" })}
                   </time>
                 </div>
                 <button
                   type="button"
                   onClick={() => void handleDelete(item.id)}
                   className="min-h-8 cursor-pointer rounded-md px-2 font-mono text-[10px] uppercase tracking-wider text-muted transition-colors duration-200 hover:text-danger"
-                  aria-label={`Delete pending message: ${item.text}`}
+                  aria-label={t("deleteItem", { text: item.text })}
                 >
-                  Delete
+                  {tCommon("delete")}
                 </button>
               </li>
             ))}
@@ -337,25 +350,21 @@ export const SyncCard = () => {
 
       <DataList
         items={[
-          { label: "IndexedDB", value: support === "checking" ? "…" : support === "supported" ? "available" : "unavailable" },
           {
-            label: "Background sync",
+            label: t("indexedDb"),
             value:
-              backgroundSync === "checking"
-                ? "checking…"
-                : backgroundSync === "available"
-                  ? "SyncManager available"
-                  : backgroundSync === "no-registration"
-                    ? "no service worker"
-                    : "unsupported",
+              support === "checking"
+                ? "…"
+                : support === "supported"
+                  ? tCommon("available")
+                  : tCommon("unavailable"),
           },
+          { label: t("backgroundSync"), value: syncStateLabel },
         ]}
       />
 
       {support === "unsupported" ? (
-        <Notice tone="warn">
-          IndexedDB or fetch is unavailable, so offline queueing cannot run in this browser.
-        </Notice>
+        <Notice tone="warn">{t("noticeUnsupported")}</Notice>
       ) : null}
 
       {feedback ? (

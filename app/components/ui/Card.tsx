@@ -1,29 +1,24 @@
 "use client";
 
+import { useFormatter, useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 
 import type { SupportState } from "@/lib/useSupport";
 
 import { Icon, type IconName } from "./icons";
 
-const pillStyles: Record<
-  SupportState,
-  { label: string; dot: string; text: string; border: string }
-> = {
+const pillStyles: Record<SupportState, { dot: string; text: string; border: string }> = {
   checking: {
-    label: "Checking",
     dot: "bg-muted",
     text: "text-muted",
     border: "border-line",
   },
   supported: {
-    label: "Supported",
     dot: "bg-accent",
     text: "text-accent",
     border: "border-accent/40",
   },
   unsupported: {
-    label: "Not supported",
     dot: "bg-warn",
     text: "text-warn",
     border: "border-warn/40",
@@ -31,39 +26,49 @@ const pillStyles: Record<
 };
 
 export const StatusPill = ({ state }: { state: SupportState }) => {
+  const t = useTranslations("common");
   const style = pillStyles[state];
+  const label =
+    state === "checking"
+      ? t("checking")
+      : state === "supported"
+        ? t("supported")
+        : t("notSupported");
 
   return (
     <span
       className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] ${style.border} ${style.text}`}
     >
       <span className={`size-1.5 rounded-full ${style.dot}`} aria-hidden="true" />
-      {style.label}
+      {label}
     </span>
   );
 };
 
 type CardProps = {
   index: number;
-  title: string;
+  /** Message namespace with `title`, `description` and `footnote` keys. */
+  namespace: string;
   api: string;
-  description: string;
   icon: IconName;
   support: SupportState;
   children: ReactNode;
-  footnote?: ReactNode;
+  /** Values for ICU placeholders that appear in the `footnote` message. */
+  footnoteValues?: Record<string, string | number>;
 };
 
 export const Card = ({
   index,
-  title,
+  namespace,
   api,
-  description,
   icon,
   support,
   children,
-  footnote,
+  footnoteValues,
 }: CardProps) => {
+  const t = useTranslations(namespace);
+  const tCommon = useTranslations("common");
+  const format = useFormatter();
   const titleId = `card-${index}-title`;
 
   return (
@@ -78,25 +83,27 @@ export const Card = ({
           </span>
           <div className="min-w-0">
             <p className="truncate font-mono text-[10px] uppercase tracking-[0.16em] text-muted">
-              S{String(index).padStart(2, "0")} · {api}
+              {tCommon("cardEyebrow", {
+                // Localises the ordinal too: "01" in English, "۰۱" in Persian.
+                index: format.number(index, { minimumIntegerDigits: 2 }),
+                api,
+              })}
             </p>
             <h2 id={titleId} className="truncate text-[15px] font-semibold text-ink">
-              {title}
+              {t("title")}
             </h2>
           </div>
         </div>
         <StatusPill state={support} />
       </header>
 
-      <p className="mt-3 text-sm leading-relaxed text-muted">{description}</p>
+      <p className="mt-3 text-sm leading-relaxed text-muted">{t("description")}</p>
 
       <div className="mt-4 flex flex-1 flex-col gap-3">{children}</div>
 
-      {footnote ? (
-        <p className="mt-4 border-t border-line pt-3 font-mono text-[11px] leading-relaxed text-muted/80">
-          {footnote}
-        </p>
-      ) : null}
+      <p className="mt-4 border-t border-line pt-3 font-mono text-[11px] leading-relaxed text-muted/80">
+        {t("footnote", footnoteValues)}
+      </p>
     </section>
   );
 };

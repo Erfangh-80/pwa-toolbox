@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 
 import { describeError, useSupport } from "@/lib/useSupport";
@@ -22,6 +23,8 @@ type Feedback = { tone: NoticeTone; text: string };
 const toHex = (value: number) => `0x${value.toString(16).padStart(4, "0")}`;
 
 export const UsbCard = () => {
+  const t = useTranslations("cards.usb");
+  const tCommon = useTranslations("common");
   const support = useSupport(() => "usb" in navigator);
   const deviceRef = useRef<ToolboxUsbDevice | null>(null);
   const [device, setDevice] = useState<UsbDeviceInfo | null>(null);
@@ -35,7 +38,7 @@ export const UsbCard = () => {
     try {
       const usb = navigator.usb;
       if (!usb) {
-        throw new Error("WebUSB is not available in this browser.");
+        throw new Error(t("unavailable"));
       }
 
       const selected = await usb.requestDevice({ filters: [] });
@@ -50,17 +53,19 @@ export const UsbCard = () => {
       setDevice({
         vendorId: toHex(selected.vendorId),
         productId: toHex(selected.productId),
-        productName: selected.productName?.trim() || "(not reported)",
-        manufacturerName: selected.manufacturerName?.trim() || "(not reported)",
-        serialNumber: selected.serialNumber?.trim() || "(not reported)",
+        productName: selected.productName?.trim() || t("notReported"),
+        manufacturerName: selected.manufacturerName?.trim() || t("notReported"),
+        serialNumber: selected.serialNumber?.trim() || t("notReported"),
       });
-      setFeedback({ tone: "success", text: "USB device opened and configured." });
+      setFeedback({ tone: "success", text: t("opened") });
     } catch (error) {
-      if (error instanceof DOMException && error.name === "NotFoundError") {
-        setFeedback({ tone: "info", text: "No device selected." });
-      } else {
-        setFeedback({ tone: "danger", text: describeError(error) });
-      }
+      setFeedback({
+        tone: error instanceof DOMException && error.name === "NotFoundError" ? "info" : "danger",
+        text:
+          error instanceof DOMException && error.name === "NotFoundError"
+            ? t("noDevice")
+            : tCommon("browserError", { message: describeError(error) }),
+      });
     } finally {
       setBusy(false);
     }
@@ -77,45 +82,37 @@ export const UsbCard = () => {
       await current.close();
       deviceRef.current = null;
       setDevice(null);
-      setFeedback({ tone: "info", text: "USB device closed and released." });
+      setFeedback({ tone: "info", text: t("closed") });
     } catch (error) {
-      setFeedback({ tone: "danger", text: describeError(error) });
+      setFeedback({
+        tone: "danger",
+        text: tCommon("browserError", { message: describeError(error) }),
+      });
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <Card
-      index={7}
-      title="WebUSB"
-      api="navigator.usb"
-      icon="usb"
-      support={support}
-      description="Pick a USB device with the browser chooser, open it, select its first configuration and read its descriptors."
-      footnote="Chromium desktop only — Safari, Firefox and mobile browsers do not implement WebUSB."
-    >
+    <Card index={7} namespace="cards.usb" api="navigator.usb" icon="usb" support={support}>
       {device ? (
         <DataList
           items={[
-            { label: "Vendor ID", value: device.vendorId },
-            { label: "Product ID", value: device.productId },
-            { label: "Product", value: device.productName },
-            { label: "Manufacturer", value: device.manufacturerName },
-            { label: "Serial", value: device.serialNumber },
+            { label: t("vendorId"), value: device.vendorId },
+            { label: t("productId"), value: device.productId },
+            { label: t("product"), value: device.productName },
+            { label: t("manufacturer"), value: device.manufacturerName },
+            { label: t("serial"), value: device.serialNumber },
           ]}
         />
       ) : (
         <p className="rounded-lg border border-dashed border-line px-3 py-6 text-center font-mono text-xs text-muted">
-          No USB device connected.
+          {t("empty")}
         </p>
       )}
 
       {support === "unsupported" ? (
-        <Notice tone="warn">
-          WebUSB is not supported here. Use Chrome or Edge on desktop with a device that
-          exposes a compatible interface.
-        </Notice>
+        <Notice tone="warn">{t("noticeUnsupported")}</Notice>
       ) : null}
 
       {feedback ? (
@@ -131,14 +128,14 @@ export const UsbCard = () => {
           disabled={support !== "supported" || busy}
           aria-busy={busy}
         >
-          {busy ? "Working…" : device ? "Connect another" : "Connect USB"}
+          {busy ? t("working") : device ? t("connectAnother") : t("connect")}
         </Button>
         <Button
           variant="danger"
           onClick={() => void handleDisconnect()}
           disabled={!device || busy}
         >
-          Disconnect
+          {t("disconnect")}
         </Button>
       </div>
     </Card>

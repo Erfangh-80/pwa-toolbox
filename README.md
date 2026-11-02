@@ -4,8 +4,27 @@ A sandbox for probing what the current browser actually supports — installabil
 offline caching, background sync, notifications, geolocation, Bluetooth, USB, share
 target, clipboard, file system access, network information and app badging.
 
-Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · `idb`. No other runtime
-dependencies were added.
+Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · `idb` · `next-intl` (English + Persian/RTL).
+
+## Languages
+
+The app ships in **English** (`/en`) and **Persian/Farsi** (`/fa`). Persian pages are
+right-to-left. `/` redirects to the negotiated locale (cookie → `Accept-Language` →
+`en`), and the `EN / FA` switch in the dashboard header keeps the current path and
+query string while swapping the locale prefix.
+
+```
+src/i18n/routing.ts     locales, default locale, prefix strategy, getDirection()
+src/i18n/request.ts     per-request locale + message catalog loading
+src/i18n/navigation.ts  locale-aware Link / useRouter / usePathname
+proxy.ts                next-intl request handler (Next 16 name for middleware.ts)
+messages/en.json        English catalog
+messages/fa.json        Persian catalog (identical key tree)
+```
+
+Client components call `useTranslations('cards.<card>')`; the shared `Card` shell owns
+`title` / `description` / `footnote`, so each card only supplies its own body strings.
+See [`docs/architecture.md`](docs/architecture.md#5-internationalization) for details.
 
 ## Getting started
 
@@ -30,17 +49,17 @@ Most capabilities require a **secure context** (HTTPS or `localhost`) and some n
 | 5 | Geolocation | `navigator.geolocation` | `app/components/GeoCard.tsx` |
 | 6 | Web Bluetooth | `navigator.bluetooth` | `app/components/BluetoothCard.tsx` |
 | 7 | WebUSB | `navigator.usb` | `app/components/UsbCard.tsx` |
-| 8 | Share target | `manifest.share_target` → `/share-target` | `app/components/ShareTargetCard.tsx` |
+| 8 | Share target | `manifest.share_target` → `/{locale}/share-target` | `app/components/ShareTargetCard.tsx` |
 | 9 | Clipboard | `navigator.clipboard` | `app/components/ClipboardCard.tsx` |
 | 10 | File system access | `showOpenFilePicker` / `showSaveFilePicker` | `app/components/FileSystemCard.tsx` |
 | 11 | Network information | `navigator.connection` | `app/components/NetworkCard.tsx` |
 | 12 | App badging | `navigator.setAppBadge` | `app/components/BadgeCard.tsx` |
 
-Dashboard: `app/page.tsx` (responsive grid, one card per section).
+Dashboard: `app/[locale]/page.tsx` (responsive grid, one card per section).
 Shared UI primitives: `app/components/ui/` (`Card`, `Button`, `TextField`, `DataList`,
 `Notice`, inline SVG `Icon`). Browser helpers: `lib/useSupport.ts`,
 `lib/useClientValue.ts`, `lib/useOnlineStatus.ts`, `lib/db.ts`, ambient API typings in
-`types/web-apis.d.ts`.
+`types/web-apis.d.ts`. Language switcher: `app/components/LanguageSwitcher.tsx`.
 
 Design tokens and interaction rules live in [`docs/design-system.md`](docs/design-system.md),
 generated with the `ui-ux-pro-max` skill.

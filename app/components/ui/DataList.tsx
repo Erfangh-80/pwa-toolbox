@@ -23,7 +23,11 @@ export const DataList = ({ items, columns = 2 }: DataListProps) => (
         <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
           {item.label}
         </dt>
-        <dd className="break-words font-mono text-xs text-ink">{item.value}</dd>
+        {/*
+          `bidi-plain` keeps Latin identifiers (device IDs, hex values, URLs) readable
+          inside an RTL layout while still aligning them to the start edge.
+        */}
+        <dd className="bidi-plain break-words font-mono text-xs text-ink">{item.value}</dd>
       </div>
     ))}
   </dl>
