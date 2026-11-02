@@ -1,36 +1,75 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PWA Toolbox
 
-## Getting Started
+A sandbox for probing what the current browser actually supports — installability,
+offline caching, background sync, notifications, geolocation, Bluetooth, USB, share
+target, clipboard, file system access, network information and app badging.
 
-First, run the development server:
+Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · `idb`. No other runtime
+dependencies were added.
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev     # http://localhost:3000
+npm run build   # production build + type check
+npm run lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Most capabilities require a **secure context** (HTTPS or `localhost`) and some need an
+**installed** PWA. Serve the build over HTTPS when testing on a phone.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## The twelve cards
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| # | Card | API | Component |
+| --- | --- | --- | --- |
+| 1 | Installability | `beforeinstallprompt`, `display-mode` | `app/components/InstallCard.tsx` |
+| 2 | Offline support | `navigator.onLine`, Cache Storage | `app/components/OfflineCard.tsx` |
+| 3 | Background sync | IndexedDB (`idb`) + SyncManager | `app/components/SyncCard.tsx` |
+| 4 | Push notifications | `Notification`, `PushManager` | `app/components/PushCard.tsx` |
+| 5 | Geolocation | `navigator.geolocation` | `app/components/GeoCard.tsx` |
+| 6 | Web Bluetooth | `navigator.bluetooth` | `app/components/BluetoothCard.tsx` |
+| 7 | WebUSB | `navigator.usb` | `app/components/UsbCard.tsx` |
+| 8 | Share target | `manifest.share_target` → `/share-target` | `app/components/ShareTargetCard.tsx` |
+| 9 | Clipboard | `navigator.clipboard` | `app/components/ClipboardCard.tsx` |
+| 10 | File system access | `showOpenFilePicker` / `showSaveFilePicker` | `app/components/FileSystemCard.tsx` |
+| 11 | Network information | `navigator.connection` | `app/components/NetworkCard.tsx` |
+| 12 | App badging | `navigator.setAppBadge` | `app/components/BadgeCard.tsx` |
 
-## Learn More
+Dashboard: `app/page.tsx` (responsive grid, one card per section).
+Shared UI primitives: `app/components/ui/` (`Card`, `Button`, `TextField`, `DataList`,
+`Notice`, inline SVG `Icon`). Browser helpers: `lib/useSupport.ts`,
+`lib/useClientValue.ts`, `lib/useOnlineStatus.ts`, `lib/db.ts`, ambient API typings in
+`types/web-apis.d.ts`.
 
-To learn more about Next.js, take a look at the following resources:
+Design tokens and interaction rules live in [`docs/design-system.md`](docs/design-system.md),
+generated with the `ui-ux-pro-max` skill.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Support detection
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Browser APIs are never touched during render. Each card resolves support inside an
+effect (via `useSupport`) and shows a `Checking → Supported / Not supported` pill.
+Unsupported capabilities keep their action disabled **and** explain themselves in the
+card body, so a missing API is never silent.
 
-## Deploy on Vercel
+## Background sync / push caveat
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`next.config.ts` and `app/sw.ts` are intentionally untouched by this iteration, so the
+app runs without a generated Serwist worker. The sync card therefore works in two
+layers:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. items are queued in IndexedDB (`pwa-toolbox` → `pending-messages`) and listed in the UI;
+2. it requests `registration.sync.register("sync-messages")` when a worker exists, and
+   otherwise flushes the queue to the mock endpoint `POST /api/sync` as soon as the
+   browser reports `online`.
+
+Once the Serwist integration is wired up, the same IndexedDB store, tag and endpoint are
+ready for a `sync` event handler in `app/sw.ts`.
+
+## Docs
+
+- [`docs/prd.md`](docs/prd.md) — product requirements
+- [`docs/architecture.md`](docs/architecture.md) — structure and data flow
+- [`docs/context.md`](docs/context.md) — coding standards
+- [`docs/tasks.md`](docs/tasks.md) — the 12-section checklist
+- [`docs/design-system.md`](docs/design-system.md) — visual system
